@@ -1,0 +1,56 @@
+## Launch Speed Twitter Bot Script
+## Christopher Gauthier - @launchspeedbot
+
+# Load Libraries
+library(tidyverse)
+library(baseballr)
+library(twitteR)
+  # Script scheduled for daily tweet using cronR RStudio add-in
+
+# Set up Twitter authentication
+api_key <- "jccnIABEYdwqSdiiEYyw6Et9f"
+api_secret <- "UDoOJYvE6HaEUsmKCMt7fukiBwurgVSkUeYIu9tL6oMT1QMzdN"
+access_token <- "1293729926982651911-aU1LnrzHHSllsxwQXCadk0R4Kpagwa"
+access_token_secret <- "F6oTVxYygB6c08ICFV9tYA327AVBDPTMDPyH5cgV2JXY1"
+options(httr_oauth_cache = TRUE)
+setup_twitter_oauth(api_key, api_secret, access_token, access_token_secret)
+
+# Perform scrape (baseballsavant.mlb.com), data manipulation
+yesterday <- scrape_statcast_savant(start_date = Sys.Date() - 1, 
+                                    end_date = Sys.Date() - 1)
+
+launchSpeeds <- yesterday %>%
+  filter(is.na(launch_speed) == FALSE & description != "foul") %>%
+  arrange(desc(launch_speed)) %>%
+  select(game_date, player_name, events, bb_type, inning_topbot, away_team, home_team, hit_distance_sc,
+         launch_speed, launch_angle, estimated_ba_using_speedangle, pitch_name, barrel) %>%
+  head(5)
+
+hitters <- launchSpeeds %>%
+  mutate(batter_team = if_else(inning_topbot == "Top", away_team, home_team),
+         result = case_when(
+           events == "home_run" ~ "HR",
+           events == "triple" ~ "3B",
+           events == "double" ~ "2B",
+           events == "single" ~ "1B",
+           events == "field_out" ~ "Out",
+           TRUE ~ ""
+         ))
+
+# Create Tweet
+intro <- paste0(format(Sys.Date() - 1, "%B %d, %Y:"))
+first <- paste0(hitters$player_name[1], ", #", hitters$batter_team[1], ", ", 
+                hitters$launch_speed[1], "mph (", hitters$result[1], ")")
+second <- paste0(hitters$player_name[2], ", #", hitters$batter_team[2], ", ", 
+                hitters$launch_speed[2], "mph (", hitters$result[2], ")")
+third <- paste0(hitters$player_name[3], ", #", hitters$batter_team[3], ", ", 
+                hitters$launch_speed[3], "mph (", hitters$result[3], ")")
+fourth <- paste0(hitters$player_name[4], ", #", hitters$batter_team[4], ", ", 
+                hitters$launch_speed[4], "mph (", hitters$result[4], ")")
+fifth <- paste0(hitters$player_name[5], ", #", hitters$batter_team[5], ", ", 
+                hitters$launch_speed[5], "mph (", hitters$result[5], ")")
+yesterday_leaders <- paste(intro, first, second, third, fourth, fifth, sep = "\n")
+yesterday_leaders
+
+# Post Tweet
+tweet(yesterday_leaders, bypassCharLimit = TRUE)
